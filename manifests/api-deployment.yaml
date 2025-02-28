@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-deployment
+  namespace: bryguan
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-pod
+  template:
+    metadata:
+      labels:
+        app: api-pod
+    spec:
+      initContainers:
+      - name: init-redis
+        image: busybox
+        command: ['sh', '-c', 'until nc -z redis-service.bryguan.svc.cluster.local 6379; do sleep 1; done']
+      containers:
+      - name: api-container
+        image: api:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        env:
+        - name: redis_url
+          value: 'redis://redis-service.bryguan.svc.cluster.local:6379'
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          failureThreshold: 30 
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
